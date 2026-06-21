@@ -1,0 +1,6 @@
+{
+  "name": "NourishTrack",
+  "description": "Fitness tracker logging diet, macros, and physiological experiences.",
+  "requestFramePermissions": ["camera"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
