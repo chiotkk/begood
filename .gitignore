@@ -1,0 +1,10 @@
+node_modules
+.next
+.env*.local
+data
+runtime
+*.sqlite
+*.sqlite-shm
+*.sqlite-wal
+
+config/llm.config.json

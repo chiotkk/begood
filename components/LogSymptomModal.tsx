@@ -10,20 +10,25 @@ export function LogSymptomModal({
   onSave 
 }: { 
   onClose: () => void; 
-  onSave: (data: any) => void;
+  onSave: (data: any) => Promise<any> | any;
 }) {
   const [category, setCategory] = useState<PhysiologicalType>('MOOD');
   const [intensity, setIntensity] = useState<number>(5);
   const [notes, setNotes] = useState('');
 
-  const handleSave = () => {
-    onSave({
-      category,
-      intensity,
-      notes
-    });
-    toast.success('Check-in saved!');
-    onClose();
+  const handleSave = async () => {
+    try {
+      await onSave({
+        category,
+        intensity,
+        notes
+      });
+      toast.success('Check-in saved!');
+      onClose();
+    } catch (error) {
+      console.error(error);
+      toast.error('Could not save check-in. Please try again.');
+    }
   };
 
   const categories: { type: PhysiologicalType, label: string, icon: any, color: string }[] = [

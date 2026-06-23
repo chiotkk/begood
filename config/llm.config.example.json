@@ -1,0 +1,20 @@
+{
+  "roles": {
+    "vision": {
+      "provider": "disabled",
+      "endpoint": "https://example-openai-compatible-host/v1/chat/completions",
+      "model": "vision-model-placeholder",
+      "apiKeyEnv": "LLM_VISION_API_KEY",
+      "maxTokens": 350,
+      "configVersion": "vision-placeholder-v1"
+    },
+    "analysis": {
+      "provider": "disabled",
+      "endpoint": "https://example-openai-compatible-host/v1/chat/completions",
+      "model": "analysis-model-placeholder",
+      "apiKeyEnv": "LLM_ANALYSIS_API_KEY",
+      "maxTokens": 700,
+      "configVersion": "analysis-placeholder-v1"
+    }
+  }
+}

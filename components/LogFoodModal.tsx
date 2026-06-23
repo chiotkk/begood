@@ -3,13 +3,14 @@
 import { useState, useRef } from 'react';
 import { Camera, Loader2, Upload, X } from 'lucide-react';
 import { toast } from 'sonner';
+import { apiPath } from '@/lib/client-api';
 
 export function LogFoodModal({ 
   onClose, 
   onSave 
 }: { 
   onClose: () => void; 
-  onSave: (data: any) => void;
+  onSave: (data: any) => Promise<any> | any;
 }) {
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
@@ -36,7 +37,7 @@ export function LogFoodModal({
 
     setIsAnalyzing(true);
     try {
-      const response = await fetch('/api/analyze', {
+      const response = await fetch(apiPath('/api/analyze'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
@@ -46,12 +47,13 @@ export function LogFoodModal({
       });
 
       if (!response.ok) {
-        throw new Error('Analysis failed');
+        const errorBody = await response.json().catch(() => ({}));
+        throw new Error(errorBody.error || 'Analysis failed');
       }
 
       const data = await response.json();
       
-      onSave({
+      await onSave({
         name: data.name || 'Unknown Food',
         calories: Number(data.calories) || 0,
         protein: Number(data.protein) || 0,
@@ -64,7 +66,7 @@ export function LogFoodModal({
       onClose();
     } catch (error: any) {
       console.error(error);
-      toast.error('Could not analyze the food. Please try again.');
+      toast.error(error?.message || 'Could not analyze the food. Please try again.');
     } finally {
       setIsAnalyzing(false);
     }

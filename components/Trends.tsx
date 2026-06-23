@@ -1,13 +1,29 @@
 'use client';
 
-import { HealthLog, FoodLog, PhysiologicalLog } from '@/types';
+import { HealthLog } from '@/types';
+import { apiPath } from '@/lib/client-api';
 import { useMemo, useState } from 'react';
+import { Loader2, RefreshCw, Sparkles } from 'lucide-react';
+import { toast } from 'sonner';
 import { 
-  LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, BarChart, Bar, Legend, ComposedChart
+  XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, Bar, Legend, ComposedChart, Line
 } from 'recharts';
+
+interface InsightResponse {
+  cached?: boolean;
+  generatedAt?: string;
+  lowData?: boolean;
+  summary?: string;
+  candidates?: Array<{ label?: string; explanation?: string; confidence?: string; detail?: string }>;
+  nextSteps?: string[];
+  disclaimer?: string;
+}
 
 export function Trends({ logs }: { logs: HealthLog[] }) {
   const [days, setDays] = useState(7);
+  const [insights, setInsights] = useState<InsightResponse | null>(null);
+  const [insightError, setInsightError] = useState<string | null>(null);
+  const [isLoadingInsights, setIsLoadingInsights] = useState(false);
 
   const chartData = useMemo(() => {
     // Generate an array of dates up to N days ago
@@ -53,6 +69,28 @@ export function Trends({ logs }: { logs: HealthLog[] }) {
     }));
   }, [logs, days]);
 
+  async function requestInsights(force = false) {
+    setIsLoadingInsights(true);
+    setInsightError(null);
+
+    try {
+      const response = await fetch(apiPath('/api/insights'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ days, force }),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.error || 'AI insights are unavailable.');
+      setInsights(data);
+      toast.success(data.cached ? 'Loaded cached AI insights.' : 'AI insights updated.');
+    } catch (error: any) {
+      setInsightError(error?.message || 'AI insights are unavailable.');
+      toast.error(error?.message || 'AI insights are unavailable.');
+    } finally {
+      setIsLoadingInsights(false);
+    }
+  }
+
   if (logs.length === 0) {
     return (
       <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 flex flex-col items-center justify-center text-gray-500 min-h-[300px]">
@@ -67,7 +105,11 @@ export function Trends({ logs }: { logs: HealthLog[] }) {
         <h3 className="font-semibold text-gray-800">Health Correlations</h3>
         <select 
           value={days} 
-          onChange={(e) => setDays(Number(e.target.value))}
+          onChange={(e) => {
+            setDays(Number(e.target.value));
+            setInsights(null);
+            setInsightError(null);
+          }}
           className="text-sm border-gray-200 rounded-lg p-2 focus:ring-blue-500 outline-none cursor-pointer"
         >
           <option value={7}>Last 7 Days</option>
@@ -96,6 +138,77 @@ export function Trends({ logs }: { logs: HealthLog[] }) {
           </ComposedChart>
         </ResponsiveContainer>
       </div>
+
+      <section className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+          <div>
+            <div className="flex items-center text-blue-700 font-semibold">
+              <Sparkles className="w-5 h-5 mr-2" />
+              AI Insights
+            </div>
+            <p className="text-sm text-gray-500 mt-1">Explicit, cached trend analysis over compact log summaries only.</p>
+          </div>
+          <div className="flex gap-2">
+            <button
+              onClick={() => requestInsights(false)}
+              disabled={isLoadingInsights}
+              className="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 disabled:bg-blue-300 text-white text-sm font-medium flex items-center justify-center"
+            >
+              {isLoadingInsights ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Sparkles className="w-4 h-4 mr-2" />}
+              Get AI Insights
+            </button>
+            <button
+              onClick={() => requestInsights(true)}
+              disabled={isLoadingInsights}
+              className="px-3 py-2 rounded-lg border border-gray-200 hover:bg-gray-50 text-gray-700 text-sm font-medium flex items-center justify-center"
+              title="Bypass the cache and request a fresh analysis"
+            >
+              <RefreshCw className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+
+        {insightError && (
+          <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
+            {insightError}
+          </div>
+        )}
+
+        {insights && (
+          <div className="space-y-3 text-sm text-gray-700">
+            <div className="rounded-lg bg-blue-50 border border-blue-100 p-3">
+              <p className="font-medium text-blue-900">{insights.summary}</p>
+              <p className="text-xs text-blue-700 mt-1">
+                {insights.cached ? 'Served from cache' : 'Fresh analysis'}{insights.generatedAt ? ` • ${new Date(insights.generatedAt).toLocaleString()}` : ''}
+              </p>
+            </div>
+
+            {Array.isArray(insights.candidates) && insights.candidates.length > 0 && (
+              <div className="space-y-2">
+                <h4 className="font-semibold text-gray-800">Candidate patterns</h4>
+                {insights.candidates.slice(0, 5).map((candidate, index) => (
+                  <div key={`${candidate.label}-${index}`} className="rounded-lg border border-gray-100 p-3">
+                    <div className="font-medium text-gray-800">{candidate.label || `Pattern ${index + 1}`}</div>
+                    <p className="text-gray-600 mt-1">{candidate.explanation || candidate.detail}</p>
+                    {candidate.confidence && <p className="text-xs text-gray-400 mt-1">Confidence: {candidate.confidence}</p>}
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {Array.isArray(insights.nextSteps) && insights.nextSteps.length > 0 && (
+              <div>
+                <h4 className="font-semibold text-gray-800 mb-1">Next steps</h4>
+                <ul className="list-disc pl-5 space-y-1 text-gray-600">
+                  {insights.nextSteps.map((step, index) => <li key={`${step}-${index}`}>{step}</li>)}
+                </ul>
+              </div>
+            )}
+
+            <p className="text-xs text-gray-400">{insights.disclaimer || 'Exploratory wellness insight only; not medical advice.'}</p>
+          </div>
+        )}
+      </section>
     </div>
   );
 }
